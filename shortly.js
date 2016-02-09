@@ -12,6 +12,8 @@ var Link = require('./app/models/link');
 var Click = require('./app/models/click');
 
 var app = express();
+//Added to require session
+var session = require('express-session');
 
 app.set('views', __dirname + '/views');
 app.set('view engine', 'ejs');
@@ -22,10 +24,31 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
 
+//router
+//rendering index
+app.use(session({secret: 'sprint123'}));
+
 
 app.get('/', 
 function(req, res) {
+  //Pass in login information
+  //helper functions needed:
+    //isLoggedIn
+    //
+
+  //Check session to see if exising session (ie - a person logged in)
+    //if so, redirect to main page
+    /*if(!req.session.isLoggedIn) {
+        res.redirect('/login')
+      } else {
+        res.render('/index')
+      }
+      */
+  
+
+  //req.session()
   res.render('index');
+
 });
 
 app.get('/create', 
@@ -33,6 +56,7 @@ function(req, res) {
   res.render('index');
 });
 
+//fetches data out of database
 app.get('/links', 
 function(req, res) {
   Links.reset().fetch().then(function(links) {
@@ -40,6 +64,7 @@ function(req, res) {
   });
 });
 
+//post information to database
 app.post('/links', 
 function(req, res) {
   var uri = req.body.url;
@@ -64,7 +89,7 @@ function(req, res) {
           title: title,
           base_url: req.headers.origin
         });
-
+        //saves this info to database
         link.save().then(function(newLink) {
           Links.add(newLink);
           res.send(200, newLink);
@@ -77,7 +102,40 @@ function(req, res) {
 /************************************************************/
 // Write your authentication routes here
 /************************************************************/
+//Sign up route:
+app.get('/signup', 
+function(req, res) {
+  res.render('signup');
+});
 
+
+//Login Route
+
+    //within login page - have logic to sign up  
+    //if not, redirect to signup page
+  
+app.get('/login', 
+function(req, res) {
+  //.get + .post
+  //renders page
+  
+  //if (!signedup){
+      //res.redirect('signup');
+    //} else {
+      //res.render('login');
+    //}
+//app.post('/login'){
+  //validate username and password, if don't exist, redirect to sign in
+//}
+
+});
+
+//Logout Route - no template, may need to refactor after
+//logout - return to index page + destroys session
+// app.get('/logout'), 
+// function(req, res) {
+//   res.render('logout');
+// });
 
 
 /************************************************************/
