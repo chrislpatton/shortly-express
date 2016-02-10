@@ -49,16 +49,30 @@ db.knex.schema.hasTable('clicks').then(function(exists) {
 
 db.knex.schema.hasTable('users').then(function(exists) {
   if (!exists) {
-    db.knes.schema.createTable('users', function (user){
+    db.knex.schema.createTable('users', function (user) {
       user.increments('id').primary();
-      user.string('username', 100);
+      user.string('username' ,100).unique;
       user.string('password', 32);
-    }).then(function(table){
+      //user.timestamps();
+    }).then(function (table) {
       console.log('Created Table', table);
     });
   }
 });
 
 
+
+
+// if (!exists) {
+//     db.knex.schema.createTable('users', function (user){
+//       user.increments('id').primary();
+//       user.string('username', 100).unique;
+//       user.string('password', 32);
+//       user.timestamps();
+//     }).then(function(table){
+//       console.log('Created Table', table);
+//     });
+//   }
+// });
 
 module.exports = db;
