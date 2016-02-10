@@ -1,7 +1,9 @@
+
 var express = require('express');
 var util = require('./lib/utility');
 var partials = require('express-partials');
 var bodyParser = require('body-parser');
+var bcrypt = require('bcrypt-nodejs');
 
 
 var db = require('./app/config');
@@ -11,11 +13,7 @@ var Links = require('./app/collections/links');
 var Link = require('./app/models/link');
 var Click = require('./app/models/click');
 
-var bcrypt = require('bcrypt-nodejs');
-
 var app = express();
-//Added to require session
-var session = require('express-session');
 
 app.set('views', __dirname + '/views');
 app.set('view engine', 'ejs');
@@ -26,60 +24,39 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
 
-//router
-//rendering index
-//START SESSION
-app.use(session({secret: 'sprint123', 
-                 resave: true,
-                 saveUninitialized: true
-               }));
+// added to require a session
+var session = require('express-session');
 
-// function restrict(req,res, next){
-//   if (req.session.user){
-//     next();
-//   } else {
-//     req.session.error = 'Please Login';
-//     res.redirect('/login');
-//   }
-// }
+// starts session
+app.use(session({
+  secret: 'sprint123',
+  resave: false,
+  saveUninitialized: true
+}));
 
-app.get('/', util.checkUser, function(req, res ) {
-  res.render('index');
-  //restrict();
-  //Pass in login information
-  //helper functions needed:
-    //isLoggedIn
-    // if(req.session && req.session.user){
-    //   //Boolean(req.session.user)
-
-    // } else {
-
-    // }
-  //Check session to see if exising session (ie - a person logged in)
-    //if so, redirect to main page
-    /*if(!req.session.isLoggedIn) {
-        res.redirect('/login')
-      } else {
-        res.render('/index')
-      }
-      */
-  //req.session()
-});
-
-//Shortens URL and puts it into index list - where is logic?
-app.get('/create', util.checkUser, function(req, res) {
+app.get('/', util.checkUser, function(req, res) {
   res.render('index');
 });
 
-//fetches data out of database
-app.get('/links', util.checkUser, function(req, res) {
+
+//Shortens url and puts it into index list
+app.get('/create', util.checkUser,  
+function(req, res) {
+  res.render('index');
+});
+
+// fetches data out of database
+app.get('/links',util.checkUser,
+function(req, res) {
   Links.reset().fetch().then(function(links) {
     res.send(200, links.models);
   });
 });
 
+
 //post information to database
-app.post('/links', util.checkUser, function(req, res) {
+app.post('/links', 
+function(req, res) {
   var uri = req.body.url;
 
   if (!util.isValidUrl(uri)) {
@@ -102,6 +79,7 @@ app.post('/links', util.checkUser, function(req, res) {
           title: title,
           base_url: req.headers.origin
         });
+        
         //saves this info to database
         link.save().then(function(newLink) {
           Links.add(newLink);
@@ -115,106 +93,69 @@ app.post('/links', util.checkUser, function(req, res) {
 /************************************************************/
 // Write your authentication routes here
 /************************************************************/
-//TODO
-//1. Revisit B-Crypt
-//2. Compare function will be here somewhere
-// Start with log-in or sign-up
-//3. Writing routes/check specs
-//4. Save to Database on sign-up
-//Get to authenticate user and password
-
-
-//Sign up route:
-//Get renders Page
-app.get('/signup', function(req, res) {
+//sign up route
+//Get renders page
+app.get('/signup', function(req, res){
   res.render('signup');
 });
 
-//POST for Signup
+//post for signup
 //input username and password
-app.post('/signup', 
-  function(req, res){
-    var username = req.body.username;
-    var password = req.body.password; 
-    new User({username: username}).fetch().then(function(user){
-      //if unique username, create new user and password
-      if(!user){
-       var newUser = new User({
-          username: username, 
-          password: password
+
+app.post('/signup', function(req, res){
+  var username = req.body.username;
+  var password = req.body.password;
+
+  new User({username: username}).fetch().then(function(user){
+    //if unique username, create new user and password
+    if (!user){
+      bcrypt.hash(password, null, null, function(err, hash){
+        Users.create({
+          username: username,
+          password: hash
+        }).then(function(user){
+          util.createSession(req, res, user);
         });
-       
-        
-       // // bcrypt.hash(password, null, null, function(err, hash){
-       // //  //create user and put in table via bookshelf method
-       // //  User.set({password: hash}).then(function(user){
-       // //    util.createSession(req, res, user);
-       // //  });
-       // // });
-
-       //saves this info to database
-        newUser.save().then(function(savedUser) {
-          Users.add(savedUser);
-          //res.send(200, savedUser);
-          //res.redirect('/login');
-          util.createSession(req, res, savedUser);
-       }); 
-
-
-      } else {
-        //show error
-        res.redirect('/signup');
-        console.log('Account already exists!  Try again!');
-      }
-
+      });
+    } else {
+      //show error
+      console.log('Account already exists!. Try again!');
+      res.redirect('/signup');
+    }
   });
 });
 
-
-//Login Route
-
-    //within login page - have logic to sign up  
-    //if not, redirect to signup page
-  //compare password SOMEWHERE
-app.get('/login', function(req, res) {
-  res.render('login');
+//login route
+app.get('/login', function(req, res){
+  res.render('login'); 
 });
+
 
 app.post('/login', function(req, res){
   var username = req.body.username;
   var password = req.body.password;
-  
-  //promises, simplify callbacks
-  var user = new User({username: username}).fetch().then(function(user){
+  new User({username: username}).fetch().then(function(user){
     if (!user){
       res.redirect('/login');
-    } 
-   // bcrypt.compare(password, user.get('password'), function(err, match){
-      user.comparePassword(password, function(match) {
-        if (match){
-          util.createSession(req, res, user);
-        } else {
-          res.redirect('/login');
-        }
+    }
+    bcrypt.compare(password, user.get('password'), function(err, match){
+      console.log('hashed', match);
+      if (match){
+        util.createSession(req, res, user);
+      } else {
+        res.redirect('/login');
+      }
     });
-
   });
 
 });
 
-  //validate username and password, if don't exist, redirect to sign in
-
-//Logout Route - no template, may need to refactor after
-//logout - return to index page + destroys session
-app.get('/logout', 
-function(req, res) {
+//logout added button in index.ejs
+app.get('/logout', function(req, res){
   req.session.destroy(function(){
     res.redirect('/');
   });
 });
-
-
-
 /************************************************************/
 // Handle the wildcard route last - if all other routes fail
 // assume the route is a short code and try and handle it here.
@@ -245,3 +186,26 @@ app.get('/*', function(req, res) {
 
 console.log('Shortly is listening on 4568');
 app.listen(4568);
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
